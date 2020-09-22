@@ -66,11 +66,11 @@ enum gf_dump_procnum {
 #ifdef GF_LINUX_HOST_OS
 #define xdr_u_int32_t xdr_uint32_t
 #define xdr_u_int64_t xdr_uint64_t
-#ifdef IPV6_DEFAULT
+//#ifdef IPV6_DEFAULT
 unsigned long
 xdr_sizeof(xdrproc_t func, void *data);
 #endif
-#endif
+//#endif
 
 #ifdef GF_DARWIN_HOST_OS
 #define xdr_u_quad_t xdr_u_int64_t

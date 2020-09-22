@@ -10871,14 +10871,14 @@ gf_cli_snapshot_cbk(struct rpc_req *req, struct iovec *iov, int count,
         goto out;
     }
 
-#if (USE_EVENTS)
-    ret = gf_cli_generate_snapshot_event(&rsp, dict, type, snap_name, volname,
-                                         snap_uuid, clone_name);
-    if (ret) {
-        gf_log("cli", GF_LOG_ERROR, "Failed to generate snapshot event");
-        goto out;
-    }
-#endif
+//#if (USE_EVENTS)
+//    ret = gf_cli_generate_snapshot_event(&rsp, dict, type, snap_name, volname,
+//                                         snap_uuid, clone_name);
+//    if (ret) {
+//        gf_log("cli", GF_LOG_ERROR, "Failed to generate snapshot event");
+//        goto out;
+//    }
+//#endif
 
     /* Snapshot status and delete command is handled separately */
     if (global_state->mode & GLUSTER_MODE_XML &&

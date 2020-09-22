@@ -123,6 +123,7 @@ typedef enum glusterd_op_ {
     GD_OP_SYS_EXEC,
     GD_OP_GSYNC_CREATE,
     GD_OP_SNAP,
+    GD_OP_ZFS_SNAP,
     GD_OP_BARRIER,
     GD_OP_GANESHA, /* obsolete */
     GD_OP_BITROT,
@@ -1295,6 +1296,9 @@ glusterd_handle_cli_list_volume(rpcsvc_request_t *req);
 int
 glusterd_handle_snapshot(rpcsvc_request_t *req);
 
+int
+glusterd_handle_zfs_snapshot(rpcsvc_request_t *req);
+
 /* op-sm functions */
 int
 glusterd_op_stage_heal_volume(dict_t *dict, char **op_errstr);
@@ -1498,6 +1502,20 @@ glusterd_add_brick_status_to_dict(dict_t *dict, glusterd_volinfo_t *volinfo,
 int32_t
 glusterd_handle_snap_limit(dict_t *dict, dict_t *rsp_dict);
 
+int
+is_zfs_filesys_path(const char *path);
+
+int
+glusterd_zfs_snapshot(dict_t *dict, char **op_errstr, uint32_t *op_errno,
+                  dict_t *rsp_dict);
+
+int
+glusterd_zfs_snapshot_prevalidate(dict_t *dict, char **op_errstr, dict_t *rsp_dict,
+                              uint32_t *op_errno);
+
+char *
+snappath_get_brickpath(char *snap_path, char brinkpath[]);
+
 gf_boolean_t
 glusterd_should_i_stop_bitd();
 
@@ -1523,5 +1541,9 @@ glusterd_options_init(xlator_t *this);
 
 int32_t
 glusterd_recreate_volfiles(glusterd_conf_t *conf);
+
+int
+glusterd_zfs_snapshot(dict_t *dict, char **op_errstr, uint32_t *op_errno,
+                  dict_t *rsp_dict);
 
 #endif

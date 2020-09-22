@@ -13,6 +13,7 @@
 #include <sys/resource.h>
 #include <sys/statvfs.h>
 #include <sys/mount.h>
+#include <sys/vfs.h>
 #include <signal.h>
 #include "glusterd-messages.h"
 #include "glusterd-errno.h"
@@ -61,6 +62,8 @@
 
 #include <glusterfs/lvm-defaults.h>
 #include <glusterfs/events.h>
+
+#define M_ZFS_SYSTEM 0x2fc12fc1  //ZFS
 
 char snap_mount_dir[VALID_GLUSTERD_PATHMAX];
 struct snap_create_args_ {
@@ -2028,6 +2031,31 @@ out:
     if (dict)
         dict_unref(dict);
 
+    return ret;
+}
+
+int is_zfs_filesys_path(const char *path)
+{
+    int ret = -1;
+    struct statfs sfs;
+    xlator_t *this = NULL;
+
+    this = THIS;
+
+    ret = statfs(path, &sfs);
+    if (ret) {
+        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_VOL_NOT_FOUND,
+               "statfs faild");
+        goto out;
+    }
+    if(M_ZFS_SYSTEM == sfs.f_type) {
+        ret = 0;
+        gf_msg(this->name, GF_LOG_NONE, 0, NULL, "brick is zfs file system");
+        goto out;
+    }
+    ret = -1;
+
+out:
     return ret;
 }
 
@@ -9277,6 +9305,91 @@ glusterd_is_lvm_cmd_available(char *lvm_cmd)
     return _gf_true;
 }
 
+int is_zfs_filesys(dict_t *dict)
+{
+    int32_t ret = -1;
+    char *volname = NULL;
+    char *snapname = NULL;
+    glusterd_volinfo_t *vol = NULL;
+    glusterd_brickinfo_t *brickinfo = NULL;
+    glusterd_volinfo_t *snap_vol = NULL;
+    glusterd_volinfo_t *tmp = NULL;
+    glusterd_snap_t *snap = NULL;
+    struct statfs sfs;
+    xlator_t *this;
+
+    this = THIS;
+    GF_ASSERT(dict);
+
+    ret = dict_get_strn(dict, "volname1", SLEN("volname1"), &volname);
+    if(ret){
+        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_DICT_GET_FAILED,
+               "Volname not present in "
+               "dict");
+        goto snapname;
+    }
+
+    ret = glusterd_volinfo_find(volname, &vol);
+    if (ret) {
+        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_VOL_NOT_FOUND,
+               "Volume %s not found ", volname);
+        goto out;
+    }
+
+    cds_list_for_each_entry(brickinfo, &vol->bricks, brick_list)
+    {
+        ret = statfs(brickinfo->path, &sfs);
+        if (ret) {
+            gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_VOL_NOT_FOUND,
+                   "statfs faild");
+            goto out;
+        }
+        if(M_ZFS_SYSTEM == sfs.f_type) {
+            ret = 0;
+            gf_msg(this->name, GF_LOG_NONE, 0, NULL, "brick is zfs file system");
+            goto out;
+        }
+    }
+
+snapname:
+    ret = dict_get_strn(dict, "snapname", SLEN("snapname"), &snapname);
+    if(ret){
+        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_DICT_GET_FAILED,
+               "Snapname not present in "
+               "dict");
+        goto out;
+    }
+    snap = glusterd_find_snap_by_name(snapname);
+    if (!snap) {
+        gf_msg(this->name, GF_LOG_ERROR, EINVAL, GD_MSG_SNAP_NOT_FOUND,
+               "Snapshot (%s) does not exist", snapname);
+        ret = -1;
+        goto out;
+    }
+
+    cds_list_for_each_entry_safe(snap_vol, tmp, &snap->volumes, vol_list)
+    {
+        cds_list_for_each_entry(brickinfo, &snap_vol->bricks, brick_list)
+        {
+            gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_INVALID_ENTRY, "brick:%s", brickinfo->path);
+            ret = statfs(brickinfo->path, &sfs);
+            if (ret) {
+                gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_VOL_NOT_FOUND,
+                       "statfs faild");
+                goto out;
+            }
+            if(M_ZFS_SYSTEM == sfs.f_type) {
+                ret = 0;
+                goto out;
+            }
+        }
+    }
+
+    ret = -1;
+out:
+    return ret;
+}
+
 int
 glusterd_handle_snapshot_fn(rpcsvc_request_t *req)
 {
@@ -9355,6 +9468,14 @@ glusterd_handle_snapshot_fn(rpcsvc_request_t *req)
                "%s (%d < %d)", err_str, conf->op_version, GD_OP_VERSION_3_6_0);
         ret = -1;
         goto out;
+    }
+
+    ret = is_zfs_filesys(dict);
+    if(0 == ret){
+        cli_op = GD_OP_ZFS_SNAP;
+        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_INVALID_ENTRY, "brick is zfs file system");
+    } else {
+        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_INVALID_ENTRY, "brick not is zfs file system");
     }
 
     ret = dict_get_int32n(dict, "type", SLEN("type"), &type);

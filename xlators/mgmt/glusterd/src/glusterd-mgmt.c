@@ -150,6 +150,18 @@ gd_mgmt_v3_pre_validate_fn(glusterd_op_t op, dict_t *dict, char **op_errstr,
             }
 
             break;
+        case GD_OP_ZFS_SNAP:
+            ret = glusterd_zfs_snapshot_prevalidate(dict, op_errstr, rsp_dict,
+                                                op_errno);
+
+            if (ret) {
+                gf_msg(this->name, GF_LOG_WARNING, 0,
+                       GD_MSG_PRE_VALIDATION_FAIL,
+                       "Snapshot Prevalidate Failed");
+                goto out;
+            }
+
+            break;
 
         case GD_OP_REPLACE_BRICK:
             ret = glusterd_op_stage_replace_brick(dict, op_errstr, rsp_dict);
@@ -267,6 +279,15 @@ gd_mgmt_v3_brick_op_fn(glusterd_op_t op, dict_t *dict, char **op_errstr,
             }
             break;
         }
+        case GD_OP_ZFS_SNAP: {
+            ret = glusterd_snapshot_brickop(dict, op_errstr, rsp_dict);
+            if (ret) {
+                gf_msg(this->name, GF_LOG_WARNING, 0, GD_MSG_BRICK_OP_FAIL,
+                       "snapshot brickop failed");
+                goto out;
+            }
+            break;
+        }
         case GD_OP_PROFILE_VOLUME:
         case GD_OP_REBALANCE:
         case GD_OP_DEFRAG_BRICK_VOLUME: {
@@ -312,6 +333,15 @@ gd_mgmt_v3_commit_fn(glusterd_op_t op, dict_t *dict, char **op_errstr,
             if (ret) {
                 gf_msg(this->name, GF_LOG_WARNING, 0, GD_MSG_COMMIT_OP_FAIL,
                        "Snapshot Commit Failed");
+                goto out;
+            }
+            break;
+        }
+        case GD_OP_ZFS_SNAP: {
+            ret = glusterd_zfs_snapshot(dict, op_errstr, op_errno, rsp_dict);
+            if (ret) {
+                gf_msg(this->name, GF_LOG_WARNING, 0, GD_MSG_COMMIT_OP_FAIL,
+                       "zfs Snapshot Commit Failed");
                 goto out;
             }
             break;
@@ -466,6 +496,17 @@ gd_mgmt_v3_post_validate_fn(glusterd_op_t op, int32_t op_ret, dict_t *dict,
 
     switch (op) {
         case GD_OP_SNAP: {
+            ret = glusterd_snapshot_postvalidate(dict, op_ret, op_errstr,
+                                                 rsp_dict);
+            if (ret) {
+                gf_msg(this->name, GF_LOG_WARNING, 0,
+                       GD_MSG_POST_VALIDATION_FAIL,
+                       "postvalidate operation failed");
+                goto out;
+            }
+            break;
+        }
+        case GD_OP_ZFS_SNAP: {
             ret = glusterd_snapshot_postvalidate(dict, op_ret, op_errstr,
                                                  rsp_dict);
             if (ret) {
@@ -837,6 +878,8 @@ glusterd_pre_validate_aggr_rsp_dict(glusterd_op_t op, dict_t *aggr, dict_t *rsp)
                 goto out;
             }
             break;
+        case GD_OP_ZFS_SNAP:
+            break;
         case GD_OP_REPLACE_BRICK:
             ret = glusterd_rb_use_rsp_dict(aggr, rsp);
             if (ret) {
@@ -1179,6 +1222,9 @@ glusterd_mgmt_v3_build_payload(dict_t **req, char **op_errstr, dict_t *dict,
     switch (op) {
         case GD_OP_MAX_OPVERSION:
         case GD_OP_SNAP:
+            dict_copy(dict, req_dict);
+            break;
+        case GD_OP_ZFS_SNAP:
             dict_copy(dict, req_dict);
             break;
         case GD_OP_START_VOLUME:
@@ -1708,13 +1754,13 @@ glusterd_mgmt_v3_commit(glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
         goto out;
     }
 
-    ret = glusterd_syncop_aggr_rsp_dict(op, op_ctx, rsp_dict);
-    if (ret) {
-        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_RESP_AGGR_FAIL, "%s",
-               "Failed to aggregate response from "
-               " node/brick");
-        goto out;
-    }
+//    ret = glusterd_syncop_aggr_rsp_dict(op, op_ctx, rsp_dict);
+//    if (ret) {
+//        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_RESP_AGGR_FAIL, "%s",
+//               "Failed to aggregate response from "
+//               " node/brick");
+//        goto out;
+//    }
 
     dict_unref(rsp_dict);
     rsp_dict = NULL;
@@ -2776,13 +2822,13 @@ unbarrier:
 
     /*Do a quorum check if the commit phase is successful*/
     if (success) {
-        // quorum check of the snapshot volume
-        ret = glusterd_snap_quorum_check(dict, _gf_true, &op_errstr, &op_errno);
-        if (ret) {
-            gf_msg(this->name, GF_LOG_WARNING, 0, GD_MSG_QUORUM_CHECK_FAIL,
-                   "Snapshot Volume quorum check failed");
-            goto out;
-        }
+            // quorum check of the snapshot volume
+//            ret = glusterd_snap_quorum_check(dict, _gf_true, &op_errstr, &op_errno);
+//            if (ret) {
+//                gf_msg(this->name, GF_LOG_WARNING, 0, GD_MSG_QUORUM_CHECK_FAIL,
+//                       "Snapshot Volume quorum check failed");
+//                goto out;
+//            }
     }
 
     ret = 0;

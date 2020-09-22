@@ -2045,6 +2045,7 @@ glusterd_volume_start_glusterfs(glusterd_volinfo_t *volinfo,
     int32_t len = 0;
     glusterd_brick_proc_t *brick_proc = NULL;
     char *inet_family = NULL;
+    char pri_brick_path[PATH_MAX] = "";
 
     GF_ASSERT(volinfo);
     GF_ASSERT(brickinfo);
@@ -2055,14 +2056,14 @@ glusterd_volume_start_glusterfs(glusterd_volinfo_t *volinfo,
     priv = this->private;
     GF_ASSERT(priv);
 
-    if (brickinfo->snap_status == -1) {
-        gf_msg(this->name, GF_LOG_INFO, 0, GD_MSG_SNAPSHOT_PENDING,
-               "Snapshot is pending on %s:%s. "
-               "Hence not starting the brick",
-               brickinfo->hostname, brickinfo->path);
-        ret = 0;
-        goto out;
-    }
+//    if (brickinfo->snap_status == -1) {
+//        gf_msg(this->name, GF_LOG_INFO, 0, GD_MSG_SNAPSHOT_PENDING,
+//               "Snapshot is pending on %s:%s. "
+//               "Hence not starting the brick",
+//               brickinfo->hostname, brickinfo->path);
+//        ret = 0;
+//        goto out;
+//    }
 
     GLUSTERD_GET_BRICK_PIDFILE(pidfile, volinfo, brickinfo, priv);
     if (gf_is_service_running(pidfile, &pid)) {
@@ -2133,10 +2134,20 @@ retry:
     }
 
     if (volinfo->is_snap_volume) {
-        len = snprintf(volfile, PATH_MAX, "/%s/%s/%s/%s.%s.%s",
-                       GLUSTERD_VOL_SNAP_DIR_PREFIX,
-                       volinfo->snapshot->snapname, volinfo->volname,
-                       volinfo->volname, brickinfo->hostname, exp_path);
+        ret = is_zfs_filesys_path(brickinfo->path);
+        if(ret == 0){
+            memset(exp_path, 0, PATH_MAX);
+            GLUSTERD_REMOVE_SLASH_FROM_PATH(snappath_get_brickpath(brickinfo->path, pri_brick_path), exp_path);
+            len = snprintf(volfile, PATH_MAX, "%s.%s.%s", volinfo->volname,
+                           brickinfo->hostname, exp_path);
+            GLUSTERD_REMOVE_SLASH_FROM_PATH(brickinfo->path, exp_path);
+        } else {
+            len = snprintf(volfile, PATH_MAX, "/%s/%s/%s/%s.%s.%s",
+                           GLUSTERD_VOL_SNAP_DIR_PREFIX,
+                           volinfo->snapshot->snapname, volinfo->volname,
+                           volinfo->volname, brickinfo->hostname, exp_path);
+            gf_msg(this->name, GF_LOG_CRITICAL, 0, GD_MSG_NO_FREE_PORTS, "no is_zfs_filesys_path");
+        }
     } else {
         len = snprintf(volfile, PATH_MAX, "%s.%s.%s", volinfo->volname,
                        brickinfo->hostname, exp_path);
@@ -2288,13 +2299,13 @@ retry:
     brick_proc->brick_count++;
 
 connect:
-    ret = glusterd_brick_connect(volinfo, brickinfo, socketpath);
-    if (ret) {
-        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_BRICK_DISCONNECTED,
-               "Failed to connect to brick %s:%s on %s", brickinfo->hostname,
-               brickinfo->path, socketpath);
-        goto out;
-    }
+//    ret = glusterd_brick_connect(volinfo, brickinfo, socketpath);
+//    if (ret) {
+//        gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_BRICK_DISCONNECTED,
+//               "Failed to connect to brick %s:%s on %s", brickinfo->hostname,
+//               brickinfo->path, socketpath);
+//        goto out;
+//    }
 
 out:
     if (ret)
@@ -6149,14 +6160,14 @@ glusterd_brick_start(glusterd_volinfo_t *volinfo,
      * three different triggers for an attempt to start the brick process
      * due to the quorum handling code in glusterd_friend_sm.
      */
-    if (brickinfo->status == GF_BRICK_STARTING || brickinfo->start_triggered) {
-        gf_msg_debug(this->name, 0,
-                     "brick %s is already in starting "
-                     "phase",
-                     brickinfo->path);
-        ret = 0;
-        goto out;
-    }
+//    if (brickinfo->status == GF_BRICK_STARTING || brickinfo->start_triggered) {
+//        gf_msg_debug(this->name, 0,
+//                     "brick %s is already in starting "
+//                     "phase",
+//                     brickinfo->path);
+//        ret = 0;
+//        goto out;
+//    }
     if (!only_connect)
         brickinfo->start_triggered = _gf_true;
 
@@ -6165,13 +6176,18 @@ glusterd_brick_start(glusterd_volinfo_t *volinfo,
     /* Compare volume-id xattr is helpful to ensure the existence of a
        brick_root path before the start/attach a brick
     */
-    size = sys_lgetxattr(brickinfo->path, GF_XATTR_VOL_ID_KEY, volid, 16);
-    if (size != 16) {
-        gf_log(this->name, GF_LOG_ERROR,
-               "Missing %s extended attribute on brick root (%s),"
-               " brick is deemed not to be a part of the volume (%s) ",
-               GF_XATTR_VOL_ID_KEY, brickinfo->path, volinfo->volname);
-        goto out;
+
+    ret = is_zfs_filesys_path(brickinfo->path);
+    if(ret)
+    {
+        size = sys_lgetxattr(brickinfo->path, GF_XATTR_VOL_ID_KEY, volid, 16);
+        if (size != 16) {
+            gf_log(this->name, GF_LOG_ERROR,
+                   "Missing %s extended attribute on brick root (%s),"
+                   " brick is deemed not to be a part of the volume (%s) ",
+                   GF_XATTR_VOL_ID_KEY, brickinfo->path, volinfo->volname);
+            goto out;
+        }
     }
 
     if (strncmp(uuid_utoa(volinfo->volume_id), uuid_utoa(volid),

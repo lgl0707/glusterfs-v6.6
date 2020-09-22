@@ -298,6 +298,12 @@ glusterd_syncop_aggr_rsp_dict(glusterd_op_t op, dict_t *aggr, dict_t *rsp)
                 goto out;
             break;
 
+        case GD_OP_ZFS_SNAP:
+            ret = glusterd_snap_use_rsp_dict(aggr, rsp);
+            if (ret)
+                goto out;
+            break;
+
         case GD_OP_SCRUB_STATUS:
             ret = glusterd_volume_bitrot_scrub_use_rsp_dict(aggr, rsp);
             break;

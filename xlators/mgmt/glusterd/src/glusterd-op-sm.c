@@ -7665,6 +7665,9 @@ glusterd_op_bricks_select(glusterd_op_t op, dict_t *dict, char **op_errstr,
         case GD_OP_SNAP:
             ret = glusterd_bricks_select_snap(dict, op_errstr, selected);
             break;
+        case GD_OP_ZFS_SNAP:
+            ret = glusterd_bricks_select_snap(dict, op_errstr, selected);
+            break;
         case GD_OP_SCRUB_STATUS:
         case GD_OP_SCRUB_ONDEMAND:
             ret = glusterd_bricks_select_scrub(dict, op_errstr, selected);

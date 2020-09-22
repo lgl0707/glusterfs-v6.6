@@ -228,9 +228,11 @@ cli_cmds_register(struct cli_state *state)
     ret = cli_cmd_snapshot_register(state);
     if (ret)
         goto out;
+
     ret = cli_cmd_global_register(state);
     if (ret)
         goto out;
+
 out:
     return ret;
 }

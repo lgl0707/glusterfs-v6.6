@@ -23,7 +23,7 @@ glusterd_la_SOURCES = glusterd.c glusterd-handler.c glusterd-sm.c \
 	glusterd-conn-helper.c glusterd-snapd-svc.c glusterd-snapd-svc-helper.c \
 	glusterd-bitd-svc.c glusterd-scrub-svc.c glusterd-server-quorum.c \
 	glusterd-reset-brick.c glusterd-tierd-svc.c glusterd-tierd-svc-helper.c \
-        glusterd-gfproxyd-svc.c glusterd-gfproxyd-svc-helper.c
+        glusterd-gfproxyd-svc.c glusterd-gfproxyd-svc-helper.c glusterd-zfs-snapshot.c
 
 
 glusterd_la_LIBADD = $(top_builddir)/libglusterfs/src/libglusterfs.la \
